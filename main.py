@@ -76,7 +76,8 @@ async def handler(request):
                 </html>
                 '''
                 content = text.encode()
-                content_length = len(content)
+                content_length = str(len(content))
+                content_type = "text/html"
 
     if(request.method == 'POST'):
         if(url_path == "users"):
