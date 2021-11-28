@@ -61,7 +61,7 @@ async def handler(request):
                 content_length = str(os.path.getsize(url_path))
                 status = 200
             else:
-                status = 404
+                status = 400
                 text = '''
                 <html>
                 <head>
