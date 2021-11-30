@@ -153,7 +153,8 @@ async def main():
     server = web.Server(handler)
     runner = web.ServerRunner(server)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8001)
+    port = config.port
+    site = web.TCPSite(runner, 'localhost', port)
     await site.start()
 
     print("======= Serving on http://127.0.0.1:8001/ ======")
