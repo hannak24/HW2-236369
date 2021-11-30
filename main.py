@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from urllib.parse import unquote
 import os.path
 import sqlite3
+from config import port, timeout, admin
 
 def parse_json_file(mimes_list):
     # Opening JSON file
@@ -177,10 +178,10 @@ async def main():
     server = web.Server(handler)
     runner = web.ServerRunner(server)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8080)
+    site = web.TCPSite(runner, 'localhost', port,shutdown_timeout=timeout)
     await site.start()
 
-    print("======= Serving on http://127.0.0.1:8080/ ======")
+    print("======= Serving on http://127.0.0.1:" + str(port) + "/ ======")
 
     # pause here for very long time by serving HTTP requests and
     # waiting for keyboard interruption
