@@ -35,13 +35,72 @@ async def find_content_type(extension):
             return mime['mime-type']
     return "not found"
 
+async def parse_content(content):
+    print("the content is: ", content)
+    parameters = content.split('&')
+    print("the parameters are: ", parameters)
+    user = ''
+    password = ''
+    for parameter in parameters:
+        if(parameter.find('username') != -1):
+            user = parameter
+        if(parameter.find('password') != -1):
+            password = parameter
+    if(user != ''):
+        user = user.split('=')[1]
+    if (password != ''):
+        password = password.split('=')[1]
+    return user, password
+
+
+async def resource_not_found(url_path):
+    status = 404
+    text = '''
+    <html>
+    <head>
+    <title>404 Not Found</title>
+    </head>
+    <body>
+    <h1>Not Found</h1>
+
+    <p> The requested URL ''' + url_path + ''' was not found on this server</p>
+    <hr/>
+    </body>
+    </html>
+    '''
+    content = text.encode()
+    content_length = str(len(content))
+    content_type = "text/html"
+    return status,content, content_length, content_type
+
+async def conflict(username):
+    status = 409
+    text = '''
+    <html>
+    <head>
+    <title>409 Conflict</title>
+    </head>
+    <body>
+    <h1>Conflict</h1>
+
+    <p> The requested username ''' + username + ''' already exists in the database</p>
+    <hr/>
+    </body>
+    </html>
+    '''
+    content = text.encode()
+    content_length = str(len(content))
+    content_type = "text/html"
+    return status,content, content_length, content_type
+
+
 async def handler(request):
     print("request headers: ", request.headers)
     print("request url path: ", request.url.path)
     print("request url scheme: ", request.url.scheme)
     print("request method: ", request.method)
-    print("request content: ", await request.content.readany())
-    #request_content = await request.content.readany()
+    body = await request.content.readany()
+    print("request content: ", body)
     url_path = request.url.path[1:]
     print('url_path: ', url_path)
     content = ''
@@ -61,46 +120,54 @@ async def handler(request):
                 content_length = str(os.path.getsize(url_path))
                 status = 200
             else:
-                status = 404
-                text = '''
-                <html>
-                <head>
-                <title>404 Not Found</title>
-                </head>
-                <body>
-                <h1>Not Found</h1>
-                
-                <p> The requested URL ''' + url_path + ''' was not found on this server</p>
-                <hr/>
-                </body>
-                </html>
-                '''
-                content = text.encode()
-                content_length = str(len(content))
-                content_type = "text/html"
+                status, content, content_length, content_type = await resource_not_found(url_path)
 
     if(request.method == 'POST'):
         if(url_path == "users"):
+            curr_user, curr_password = await parse_content(body.decode("utf-8"))
+            print("username and password are: ", curr_user, curr_password)
             status = 200
-            content = 'user added to db'.encode()
+            content = ('user ' + curr_user + ' was added to the db').encode()
             content_length = str(len(content))
-            username = 'user1'
-            password = '1234'
             conn = sqlite3.connect('users.db')
             cur = conn.cursor()
+
+            try:
             # Insert a row of data
-            cur.execute("INSERT INTO Users VALUES (username,password)")
-            # Save (commit) the changes
-            conn.commit()
-            # We can also close the connection if we are done with it.
-            # Just be sure any changes have been committed or they will be lost.
+                print("INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
+                cur.execute("INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
+                conn.commit()
+            except:
+                print("error! user already defined")
+                status, content, content_length, content_type = await conflict(curr_user)
             conn.close()
-            pass
-            # #print("data: " , await request.text())
-            # body = unquote(request_content)
-            # print(body)
-            # #parsed = urlparse(await request.content.readany())
-            # #print("password: ", parsed.password)
+        else:
+            status, content, content_length, content_type = await resource_not_found(url_path)
+
+    if (request.method == 'DELETE'):
+        parsed_url = url_path.split('/')
+        if (parsed_url[0] == "users"):
+            if url_path.find("/") != -1:
+                user = parsed_url[1]
+            else:
+                user = ""
+            print("username to delete is: ", user)
+            status = 200
+            content = ('user ' + user + ' was deleted from the db').encode()
+            content_length = str(len(content))
+            conn = sqlite3.connect('users.db')
+            cur = conn.cursor()
+            try:
+                # Delete a row of data
+                print("DELETE FROM Users WHERE username =" + "'" + user + "'")
+                cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
+                conn.commit()
+            except:
+                print("error!")
+            conn.close()
+        else:
+            status, content, content_length, content_type = await resource_not_found(url_path)
+
 
     return web.Response(body=content, status=status,
                         headers ={'Content-Length': content_length, 'Connection': connection,"Content-Type" : content_type,  "charset" : "utf-8"})
