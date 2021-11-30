@@ -7,6 +7,7 @@ from urllib.parse import unquote
 import os.path
 import sqlite3
 from config import port, timeout, admin
+import base64
 
 def parse_json_file(mimes_list):
     # Opening JSON file
@@ -94,9 +95,32 @@ async def conflict(username):
     content_type = "text/html"
     return status,content, content_length, content_type
 
+async def unauthorized():
+    status = 401
+    text = '''
+    <html>
+    <head>
+    <title>401 Unauthorized</title>
+    </head>
+    <body>
+    <h1>Unauthorized</h1>
+
+    <p> You aren't authorized to do this action</p>
+    <hr/>
+    </body>
+    </html>
+    '''
+    content = text.encode()
+    content_length = str(len(content))
+    content_type = "text/html"
+    return status,content, content_length, content_type
+
 
 async def handler(request):
+    print("adminCardentials: ", admin)
     print("request headers: ", request.headers)
+    print("is there a 'Authorization' header?", 'Authorization' in request.headers)
+    #print("request header authorization: ", request.headers['Authorization'])
     print("request url path: ", request.url.path)
     print("request url scheme: ", request.url.scheme)
     print("request method: ", request.method)
@@ -104,6 +128,10 @@ async def handler(request):
     print("request content: ", body)
     url_path = request.url.path[1:]
     print('url_path: ', url_path)
+    admin_username = admin['username']
+    admin_password = admin['password']
+    adminCardentials = base64.b64encode(bytes((admin_username + ":" + admin_password), 'utf-8'))
+    print("encoded admin cardentials: ",adminCardentials )
     content = ''
     status = 500
     content_type = 'text\html'
@@ -124,26 +152,34 @@ async def handler(request):
                 status, content, content_length, content_type = await resource_not_found(url_path)
 
     if(request.method == 'POST'):
-        if(url_path == "users"):
-            curr_user, curr_password = await parse_content(body.decode("utf-8"))
-            print("username and password are: ", curr_user, curr_password)
-            status = 200
-            content = ('user ' + curr_user + ' was added to the db').encode()
-            content_length = str(len(content))
-            conn = sqlite3.connect('users.db')
-            cur = conn.cursor()
+        if 'Authorization' in request.headers:
+            author_request = request.headers['Authorization'].split(' ')
+            print("author_request: ", author_request)
+            if author_request[0] == "Basic" and author_request[1] == adminCardentials.decode("utf-8"):
+                if(url_path == "users"):
+                    curr_user, curr_password = await parse_content(body.decode("utf-8"))
+                    print("username and password are: ", curr_user, curr_password)
+                    status = 200
+                    content = ('user ' + curr_user + ' was added to the db').encode()
+                    content_length = str(len(content))
+                    conn = sqlite3.connect('users.db')
+                    cur = conn.cursor()
 
-            try:
-            # Insert a row of data
-                print("INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
-                cur.execute("INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
-                conn.commit()
-            except:
-                print("error! user already defined")
-                status, content, content_length, content_type = await conflict(curr_user)
-            conn.close()
+                    try:
+                    # Insert a row of data
+                        print("INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
+                        cur.execute("INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
+                        conn.commit()
+                    except:
+                        print("error! user already defined")
+                        status, content, content_length, content_type = await conflict(curr_user)
+                    conn.close()
+                else:
+                    status, content, content_length, content_type = await resource_not_found(url_path)
+            else:
+                status, content, content_length, content_type = await unauthorized()
         else:
-            status, content, content_length, content_type = await resource_not_found(url_path)
+            status, content, content_length, content_type = await unauthorized()
 
     if (request.method == 'DELETE'):
         parsed_url = url_path.split('/')
