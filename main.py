@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
 
+import aiofiles
 from aiohttp import web
 import json
 import urllib
@@ -127,7 +128,9 @@ async def dp_parser(request):
     if not file_path.is_file():
         return 404
     content = ''
-    file = open(f".{request.path}").read()
+    async with aiofiles.open(f".{request.path}") as op_file:
+        file = await op_file.read()
+        # read()
     sp = file.split('%')
 
     for index,str in enumerate(sp):
