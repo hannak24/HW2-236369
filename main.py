@@ -12,6 +12,9 @@ import sqlite3
 
 import config
 
+# 1 for authenticated, 0 for unauthenticated
+CURR_USER_STAT = 0
+
 
 def parse_json_file(mimes_list):
     # Opening JSON file
@@ -111,12 +114,18 @@ async def handler(request):
             # #parsed = urlparse(await request.content.readany())
             # #print("password: ", parsed.password)
     if url_path.endswith('.dp'):
-        # print("I CHECKED IN HERE")
-        print(f"[REQUEST PATH] {request.path}")
-        content = await dp_parser(request)
-        content = content.encode()
-        content_length = str(len(content))
-        content_type = "text/html"
+        if CURR_USER_STAT == 1:
+            # print("I CHECKED IN HERE")
+            print(f"[REQUEST PATH] {request.path}")
+            content = await dp_parser(request)
+            content = content.encode()
+            content_length = str(len(content))
+            content_type = "text/html"
+
+        #     user unauthenticated, ask for user's details
+        else:
+            return web.Response(status=401, reason="Unauthorized",
+                                headers={"WWW-Authenticate": "Basic realm=Users", "Connection": "close"})
 
     return web.Response(body=content, status=status,
                         headers={'Content-Length': content_length, 'Connection': connection,
@@ -130,11 +139,10 @@ async def dp_parser(request):
     content = ''
     async with aiofiles.open(f".{request.path}") as op_file:
         file = await op_file.read()
-        # read()
     sp = file.split('%')
 
-    for index,str in enumerate(sp):
-        to_add=''
+    for index, str in enumerate(sp):
+        to_add = ''
         if index % 2 == 0:
             to_add += str
         else:
@@ -149,7 +157,6 @@ async def dp_parser(request):
 
     print(f"[THIS IS THE CONTENT] {content}")
     return content
-
 
 
 async def main():
