@@ -115,6 +115,17 @@ async def unauthorized():
     content_type = "text/html"
     return status,content, content_length, content_type
 
+def response(status,content, content_length, content_type, connection, autentication_flag, realm):
+    if (autentication_flag == 0):
+        return web.Response(body=content, status=status,
+                     headers={'Content-Length': content_length, 'Connection': connection, "Content-Type": content_type,
+                              "charset": "utf-8"})
+    else:
+        return web.Response(body=content, status=status,
+                     headers={'Content-Length': content_length, 'Connection': connection, "Content-Type": content_type,
+                              "charset": "utf-8", "WWW-Authenticate": 'Basic ' + 'realm=' + realm })
+
+
 
 async def handler(request):
     print("adminCardentials: ", admin)
@@ -137,6 +148,8 @@ async def handler(request):
     content_type = 'text\html'
     content_length = 0
     connection = 'close'
+    autentication_flag = 0
+    realm = 'admin'
     if(request.method == 'GET'):
         extension = await parse_requst(url_path)
         print('extension: ', extension)
@@ -178,36 +191,53 @@ async def handler(request):
                     status, content, content_length, content_type = await resource_not_found(url_path)
             else:
                 status, content, content_length, content_type = await unauthorized()
+                autentication_flag = 1
+                realm = 'admin'
         else:
             status, content, content_length, content_type = await unauthorized()
+            autentication_flag = 1
+            realm = 'admin'
 
     if (request.method == 'DELETE'):
-        parsed_url = url_path.split('/')
-        if (parsed_url[0] == "users"):
-            if url_path.find("/") != -1:
-                user = parsed_url[1]
+        if 'Authorization' in request.headers:
+            author_request = request.headers['Authorization'].split(' ')
+            print("author_request: ", author_request)
+            if author_request[0] == "Basic" and author_request[1] == adminCardentials.decode("utf-8"):
+                parsed_url = url_path.split('/')
+                if (parsed_url[0] == "users"):
+                    if url_path.find("/") != -1:
+                        user = parsed_url[1]
+                    else:
+                        user = ""
+                    print("username to delete is: ", user)
+                    status = 200
+                    content = ('user ' + user + ' was deleted from the db').encode()
+                    content_length = str(len(content))
+                    conn = sqlite3.connect('users.db')
+                    cur = conn.cursor()
+                    try:
+                        # Delete a row of data
+                        print("DELETE FROM Users WHERE username =" + "'" + user + "'")
+                        cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
+                        conn.commit()
+                    except:
+                        print("error!")
+                    conn.close()
+                else:
+                    status, content, content_length, content_type = await resource_not_found(url_path)
             else:
-                user = ""
-            print("username to delete is: ", user)
-            status = 200
-            content = ('user ' + user + ' was deleted from the db').encode()
-            content_length = str(len(content))
-            conn = sqlite3.connect('users.db')
-            cur = conn.cursor()
-            try:
-                # Delete a row of data
-                print("DELETE FROM Users WHERE username =" + "'" + user + "'")
-                cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
-                conn.commit()
-            except:
-                print("error!")
-            conn.close()
+                status, content, content_length, content_type = await unauthorized()
+                autentication_flag = 1
+                realm = 'admin'
         else:
-            status, content, content_length, content_type = await resource_not_found(url_path)
+            status, content, content_length, content_type = await unauthorized()
+            autentication_flag = 1
+            realm = 'admin'
 
 
-    return web.Response(body=content, status=status,
-                        headers ={'Content-Length': content_length, 'Connection': connection,"Content-Type" : content_type,  "charset" : "utf-8"})
+    #return web.Response(body=content, status=status,
+                        #headers ={'Content-Length': content_length, 'Connection': connection,"Content-Type" : content_type,  "charset" : "utf-8"})
+    return response(status, content, content_length, content_type, connection, autentication_flag, realm)
 
 
 async def main():
