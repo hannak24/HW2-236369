@@ -12,12 +12,6 @@ import sqlite3
 from config import port, timeout, admin
 import base64
 
-import config
-
-# 1 for authenticated, 0 for unauthenticated
-CURR_USER_STAT = 0
-
-
 def parse_json_file(mimes_list):
     # Opening JSON file
     f = open('mime.json')
@@ -34,20 +28,17 @@ def parse_json_file(mimes_list):
     # Closing file
     f.close()
 
-
 async def parse_requst(request):
     parsed_request = request
     words = parsed_request.replace(" ", "").split('HTTP')
     path_and_extension = words[0].split('.')
-    return path_and_extension[1]  # return extension
-
+    return path_and_extension[1] #return extension
 
 async def find_content_type(extension):
     for mime in mimes_list:
-        if (extension == mime['extension']):
+        if(extension == mime['extension']):
             return mime['mime-type']
     return "not found"
-
 
 async def parse_content(content):
     print("the content is: ", content)
@@ -154,7 +145,7 @@ async def handler(request):
     admin_username = admin['username']
     admin_password = admin['password']
     adminCardentials = base64.b64encode(bytes((admin_username + ":" + admin_password), 'utf-8'))
-    print("encoded admin cardentials: ",adminCardentials )
+    print("encoded admin cardentials: ",adminCardentials)
     content = ''
     status = 500
     content_type = 'text\html'
@@ -168,13 +159,35 @@ async def handler(request):
         content_type = await find_content_type(extension)
         print("content_type: ", content_type)
         if url_path is not None:
-            if (os.path.exists(url_path)):
+            if(os.path.exists(url_path)):
                 with open(url_path, "rb") as f:
                     content = f.read()
                 content_length = str(os.path.getsize(url_path))
                 status = 200
+                autentication_flag=1
+                if url_path.endswith('.dp'):
+                    if 'Authorization' in request.headers:
+                        author_request = request.headers['Authorization'].split(' ')
+                        print("author_request: ", author_request)
+                        if author_request[0] == "Basic" and author_request[1] == adminCardentials.decode("utf-8"):
+                            curr_user, curr_password = await parse_content(body.decode("utf-8"))
+                            print("username and password are: ", curr_user, curr_password)
+                    if autentication_flag == 1:
+                        print(f"[REQUEST PATH] {request.path}")
+                        content = await dp_parser(request)
+                        content = content.encode()
+                        content_length = str(len(content))
+                        content_type = "text/html"
+                    else:
+                        status, content, content_length, content_type = await unauthorized()
+                        autentication_flag = 1
+                        realm = 'admin'
+
+
             else:
                 status, content, content_length, content_type = await resource_not_found(url_path)
+
+
 
     if(request.method == 'POST'):
         if 'Authorization' in request.headers:
@@ -251,6 +264,7 @@ async def handler(request):
                         #headers ={'Content-Length': content_length, 'Connection': connection,"Content-Type" : content_type,  "charset" : "utf-8"})
     return response(status, content, content_length, content_type, connection, autentication_flag, realm)
 
+
 async def dp_parser(request):
     file_path = Path(f".{request.path}")
     if not file_path.is_file():
@@ -287,10 +301,9 @@ async def main():
 
     print("======= Serving on http://127.0.0.1:" + str(port) + "/ ======")
 
-
     # pause here for very long time by serving HTTP requests and
     # waiting for keyboard interruption
-    await asyncio.sleep(100 * 3600)
+    await asyncio.sleep(100*3600)
 
 
 mimes_list = []
