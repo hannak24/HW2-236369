@@ -9,6 +9,10 @@ from urllib.parse import urlparse
 from urllib.parse import unquote
 import os.path
 import sqlite3
+
+
+
+import config
 from config import port, timeout, admin
 import base64
 
@@ -164,26 +168,37 @@ async def handler(request):
                     content = f.read()
                 content_length = str(os.path.getsize(url_path))
                 status = 200
-                autentication_flag=1
+
                 if url_path.endswith('.dp'):
                     if 'Authorization' in request.headers:
                         author_request = request.headers['Authorization'].split(' ')
-                        print("author_request: ", author_request)
-                        if author_request[0] == "Basic" and author_request[1] == adminCardentials.decode("utf-8"):
-                            curr_user, curr_password = await parse_content(body.decode("utf-8"))
-                            print("username and password are: ", curr_user, curr_password)
-                    if autentication_flag == 1:
-                        print(f"[REQUEST PATH] {request.path}")
-                        content = await dp_parser(request)
-                        content = content.encode()
-                        content_length = str(len(content))
-                        content_type = "text/html"
+                        if author_request[0] == "Basic":
+                            details = base64.b64decode(author_request[1]).decode().split(":")
+                            username = details[0]
+                            password = details[1]
+                            print("details:", details)
+                            print("username:", username)
+                            print("password:", password)
+                            conn = sqlite3.connect('users.db')
+                            cur = conn.cursor()
+                            try:
+                                cur.execute(" SELECT * FROM Users WHERE username=? AND password=?", (username, password))
+                                conn.commit()
+                            except:
+                                print("error! user does not EXIST")
+                            conn.close()
+                            content = await dp_parser(request,username)
+                            content = content.encode()
+                            content_length = str(len(content))
+                            content_type = "text/html"
+
                     else:
                         status, content, content_length, content_type = await unauthorized()
+                        # content = await dp_parser(request, "None",False)
+                        # content = content.encode()
+                        # content_length = str(len(content))
                         autentication_flag = 1
                         realm = 'admin'
-
-
             else:
                 status, content, content_length, content_type = await resource_not_found(url_path)
 
@@ -265,7 +280,7 @@ async def handler(request):
     return response(status, content, content_length, content_type, connection, autentication_flag, realm)
 
 
-async def dp_parser(request):
+async def dp_parser(request, username, auth_flag=True):
     file_path = Path(f".{request.path}")
     if not file_path.is_file():
         return 404
@@ -280,7 +295,8 @@ async def dp_parser(request):
             to_add += str
         else:
             res = {}
-            exec(f"to_add={str}", {"user": {"authenticated": True, "username": 'user1'}}, res)
+            exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}}, res)
+            # exec(f"to_add={str}", {"user": {"authenticated": True, "username": username}}, res)
             to_add = res['to_add']
         if to_add.endswith('{'):
             to_add = to_add[:-1]
