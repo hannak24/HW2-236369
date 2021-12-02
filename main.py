@@ -1,11 +1,12 @@
 import asyncio
 from pathlib import Path
+from urllib import parse
 
 import aiofiles
 from aiohttp import web
 import json
 import urllib
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from urllib.parse import unquote
 import os.path
 import sqlite3
@@ -168,7 +169,10 @@ async def handler(request):
                     content = f.read()
                 content_length = str(os.path.getsize(url_path))
                 status = 200
-
+                get_params = parse.urlsplit(str(request.url)).query
+                params = dict(parse.parse_qsl(get_params))
+                print("get params: ", get_params)
+                print("params: ", params)
                 if url_path.endswith('.dp'):
                     if 'Authorization' in request.headers:
                         author_request = request.headers['Authorization'].split(' ')
@@ -187,7 +191,7 @@ async def handler(request):
                             except:
                                 print("error! user does not EXIST")
                             conn.close()
-                            content = await dp_parser(request,username)
+                            content = await dp_parser(request,params,username)
                             content = content.encode()
                             content_length = str(len(content))
                             content_type = "text/html"
@@ -280,7 +284,7 @@ async def handler(request):
     return response(status, content, content_length, content_type, connection, autentication_flag, realm)
 
 
-async def dp_parser(request, username, auth_flag=True):
+async def dp_parser(request, params, username, auth_flag=True):
     file_path = Path(f".{request.path}")
     if not file_path.is_file():
         return 404
@@ -295,7 +299,7 @@ async def dp_parser(request, username, auth_flag=True):
             to_add += str
         else:
             res = {}
-            exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}}, res)
+            exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}, "params": params}, res)
             # exec(f"to_add={str}", {"user": {"authenticated": True, "username": username}}, res)
             to_add = res['to_add']
         if to_add.endswith('{'):
