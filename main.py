@@ -197,10 +197,10 @@ async def handler(request):
                             content_type = "text/html"
 
                     else:
-                        status, content, content_length, content_type = await unauthorized()
-                        # content = await dp_parser(request, "None",False)
-                        # content = content.encode()
-                        # content_length = str(len(content))
+                        status = 401
+                        content = await dp_parser(request, params, "None", False)
+                        content = content.encode()
+                        content_length = str(len(content))
                         autentication_flag = 1
                         realm = 'admin'
             else:
@@ -300,7 +300,6 @@ async def dp_parser(request, params, username, auth_flag=True):
         else:
             res = {}
             exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}, "params": params}, res)
-            # exec(f"to_add={str}", {"user": {"authenticated": True, "username": username}}, res)
             to_add = res['to_add']
         if to_add.endswith('{'):
             to_add = to_add[:-1]
