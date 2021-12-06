@@ -37,7 +37,10 @@ async def parse_requst(request):
     parsed_request = request
     words = parsed_request.replace(" ", "").split('HTTP')
     path_and_extension = words[0].split('.')
-    return path_and_extension[1]  # return extension
+    if(len(path_and_extension) == 1):
+        return ""
+    else:
+        return path_and_extension[1]  # return extension
 
 
 async def find_content_type(extension):
