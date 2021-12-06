@@ -132,6 +132,46 @@ async def unauthorized():
     content_type = "text/html"
     return status, content, content_length, content_type
 
+async def forbidden():
+    status = 403
+    text = '''
+    <html>
+    <head>
+    <title>403 forbbiden</title>
+    </head>
+    <body>
+    <h1>Forbidden</h1>
+
+    <p> The access to this resource is forbidden</p>
+    <hr/>
+    </body>
+    </html>
+    '''
+    content = text.encode()
+    content_length = str(len(content))
+    content_type = "text/html"
+    return status, content, content_length, content_type
+
+async def bad_request():
+    status = 400
+    text = '''
+    <html>
+    <head>
+    <title>400 Bad Request</title>
+    </head>
+    <body>
+    <h1>Bad Request</h1>
+
+    <p> You aren't asking for a file</p>
+    <hr/>
+    </body>
+    </html>
+    '''
+    content = text.encode()
+    content_length = str(len(content))
+    content_type = "text/html"
+    return status, content, content_length, content_type
+
 
 def response(status, content, content_length, content_type, connection, autentication_flag, realm):
     if (autentication_flag == 0):
@@ -176,45 +216,52 @@ async def handler(request):
         print("content_type: ", content_type)
         if url_path is not None:
             if (os.path.exists(url_path)):
-                with open(url_path, "rb") as f:
-                    content = f.read()
-                content_length = str(os.path.getsize(url_path))
-                status = 200
-                get_params = parse.urlsplit(str(request.url)).query
-                params = dict(parse.parse_qsl(get_params))
-                print("get params: ", get_params)
-                print("params: ", params)
-                if url_path.endswith('.dp'):
-                    if 'Authorization' in request.headers:
-                        author_request = request.headers['Authorization'].split(' ')
-                        if author_request[0] == "Basic":
-                            details = base64.b64decode(author_request[1]).decode().split(":")
-                            username = details[0]
-                            password = details[1]
-                            print("details:", details)
-                            print("username:", username)
-                            print("password:", password)
-                            conn = sqlite3.connect('users.db')
-                            cur = conn.cursor()
-                            try:
-                                cur.execute(" SELECT * FROM Users WHERE username=? AND password=?",
-                                            (username, password))
-                                conn.commit()
-                            except:
-                                print("error! user does not EXIST")
-                            conn.close()
-                            content = await dp_parser(request, params, username)
-                            content = content.encode()
-                            content_length = str(len(content))
-                            content_type = "text/html"
-
+                if(url_path == "users.db" or url_path == "config.py"):
+                    status, content, content_length, content_type = await forbidden()
+                    autentication_flag = 0;
+                    realm = 'admin'
+                else:
+                    if(os.path.isfile(url_path) == 0):
+                        status, content, content_length, content_type = await bad_request()
                     else:
-                        status = 401
-                        content = await dp_parser(request, params, "None", False)
-                        content = content.encode()
-                        content_length = str(len(content))
-                        autentication_flag = 1
-                        realm = 'admin'
+                        with open(url_path, "rb") as f:
+                            content = f.read()
+                        content_length = str(os.path.getsize(url_path))
+                        status = 200
+                        get_params = parse.urlsplit(str(request.url)).query
+                        params = dict(parse.parse_qsl(get_params))
+                        print("get params: ", get_params)
+                        print("params: ", params)
+                        if url_path.endswith('.dp'):
+                            if 'Authorization' in request.headers:
+                                author_request = request.headers['Authorization'].split(' ')
+                                if author_request[0] == "Basic":
+                                    details = base64.b64decode(author_request[1]).decode().split(":")
+                                    username = details[0]
+                                    password = details[1]
+                                    print("details:", details)
+                                    print("username:", username)
+                                    print("password:", password)
+                                    conn = sqlite3.connect('users.db')
+                                    cur = conn.cursor()
+                                    try:
+                                        cur.execute(" SELECT * FROM Users WHERE username=? AND password=?",
+                                                    (username, password))
+                                        conn.commit()
+                                    except:
+                                        print("error! user does not EXIST")
+                                    conn.close()
+                                    content = await dp_parser(request, params, username)
+                                    content = content.encode()
+                                    content_length = str(len(content))
+                                    content_type = "text/html"
+                            else:
+                                status = 401
+                                content = await dp_parser(request, params, "None", False)
+                                content = content.encode()
+                                content_length = str(len(content))
+                                autentication_flag = 1
+                                realm = 'admin'
             else:
                 status, content, content_length, content_type = await resource_not_found(url_path)
 
