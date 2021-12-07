@@ -63,6 +63,27 @@ async def parse_content(content):
     return user, password
 
 
+async def internal_server_error():
+    status = 500
+    text = '''
+    <html>
+    <head>
+    <title>500 Internal Server Error</title>
+    </head>
+    <body>
+    <h1>500 Internal Server Error</h1>
+
+    <p> Server got itself in trouble</p>
+    <hr/>
+    </body>
+    </html>
+    '''
+    content = text
+    content_length = str(len(content))
+    content_type = "text/html"
+    return status, content, content_length, content_type
+
+
 async def resource_not_found(url_path):
     status = 404
     text = '''
@@ -227,7 +248,7 @@ async def handler(request):
                                         check = cur.fetchone()
                                         conn.commit()
                                     except:
-                                        print("error!")
+                                        status, content, content_length, content_type = await internal_server_error()
                                     conn.close()
                                     if check is None and not is_admin:
                                         status = 401
@@ -304,7 +325,7 @@ async def handler(request):
                             cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
                             conn.commit()
                         except:
-                            print("error!")
+                            status, content, content_length, content_type = await internal_server_error()
                         conn.close()
                 else:
                     status, content, content_length, content_type = await resource_not_found(url_path)
@@ -330,20 +351,22 @@ async def dp_parser(request, params, username, auth_flag=True):
     async with aiofiles.open(f".{request.path}") as op_file:
         file = await op_file.read()
     sp = file.split('%')
-
-    for index, str in enumerate(sp):
-        to_add = ''
-        if index % 2 == 0:
-            to_add += str
-        else:
-            res = {}
-            exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}, "params": params}, res)
-            to_add = res['to_add']
-        if to_add.endswith('{'):
-            to_add = to_add[:-1]
-        if to_add.startswith('}'):
-            to_add = to_add[1:]
-        content += to_add
+    try:
+        for index, str in enumerate(sp):
+            to_add = ''
+            if index % 2 == 0:
+                to_add += str
+            else:
+                res = {}
+                exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}, "params": params}, res)
+                to_add = res['to_add']
+            if to_add.endswith('{'):
+                to_add = to_add[:-1]
+            if to_add.startswith('}'):
+                to_add = to_add[1:]
+            content += to_add
+    except:
+        status, content, content_length, content_type = await internal_server_error()
 
     return content
 
