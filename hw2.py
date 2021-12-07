@@ -48,9 +48,7 @@ async def find_content_type(extension):
 
 
 async def parse_content(content):
-    print("the content is: ", content)
     parameters = content.split('&')
-    print("the parameters are: ", parameters)
     user = ''
     password = ''
     for parameter in parameters:
@@ -207,8 +205,8 @@ async def handler(request):
                     if(os.path.isfile(url_path) == 0):
                         status, content, content_length, content_type = await bad_request()
                     else:
-                        with open(url_path, "rb") as f:
-                            content = f.read()
+                        async with aiofiles.open(url_path,"rb") as f:
+                            content = await f.read()
                         content_length = str(os.path.getsize(url_path))
                         status = 200
                         get_params = parse.urlsplit(str(request.url)).query
@@ -324,7 +322,7 @@ async def handler(request):
 async def dp_parser(request, params, username, auth_flag=True):
     file_path = Path(f".{request.path}")
     if not file_path.is_file():
-        return 404
+        return resource_not_found(file_path)
     content = ''
     async with aiofiles.open(f".{request.path}") as op_file:
         file = await op_file.read()
