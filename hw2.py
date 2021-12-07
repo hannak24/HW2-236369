@@ -6,12 +6,9 @@ import aiofiles
 from aiohttp import web
 import json
 import urllib
-from urllib.parse import urlparse, parse_qs
-from urllib.parse import unquote
 import os.path
 import sqlite3
 
-import config
 from config import port, timeout, admin
 import base64
 
@@ -185,21 +182,11 @@ def response(status, content, content_length, content_type, connection, autentic
 
 
 async def handler(request):
-    print("adminCardentials: ", admin)
-    print("request headers: ", request.headers)
-    print("is there a 'Authorization' header?", 'Authorization' in request.headers)
-    # print("request header authorization: ", request.headers['Authorization'])
-    print("request url path: ", request.url.path)
-    print("request url scheme: ", request.url.scheme)
-    print("request method: ", request.method)
     body = await request.content.readany()
-    print("request content: ", body)
     url_path = request.url.path[1:]
-    print('url_path: ', url_path)
     admin_username = admin['username']
     admin_password = admin['password']
     adminCardentials = base64.b64encode(bytes((admin_username + ":" + admin_password), 'utf-8'))
-    print("encoded admin cardentials: ", adminCardentials)
     content = ''
     status = 500
     content_type = 'text\html'
@@ -209,9 +196,7 @@ async def handler(request):
     realm = 'admin'
     if (request.method == 'GET'):
         extension = await parse_requst(url_path)
-        print('extension: ', extension)
         content_type = await find_content_type(extension)
-        print("content_type: ", content_type)
         if url_path is not None:
             if (os.path.exists(url_path)):
                 if(url_path == "users.db" or url_path == "config.py"):
@@ -228,8 +213,6 @@ async def handler(request):
                         status = 200
                         get_params = parse.urlsplit(str(request.url)).query
                         params = dict(parse.parse_qsl(get_params))
-                        print("get params: ", get_params)
-                        print("params: ", params)
                         if url_path.endswith('.dp'):
                             if 'Authorization' in request.headers:
                                 author_request = request.headers['Authorization'].split(' ')
@@ -237,9 +220,6 @@ async def handler(request):
                                     details = base64.b64decode(author_request[1]).decode().split(":")
                                     username = details[0]
                                     password = details[1]
-                                    print("details:", details)
-                                    print("username:", username)
-                                    print("password:", password)
                                     conn = sqlite3.connect('users.db')
                                     cur = conn.cursor()
                                     is_admin = (username == admin_username and password == admin_password)
@@ -273,15 +253,11 @@ async def handler(request):
     if (request.method == 'POST'):
         if 'Authorization' in request.headers:
             author_request = request.headers['Authorization'].split(' ')
-            print("author_request: ", author_request)
             if author_request[0] == "Basic" and author_request[1] == adminCardentials.decode("utf-8"):
                 if (url_path == "users"):
                     curr_user, curr_password = await parse_content(body.decode("utf-8"))
-                    print("username and password are: ", curr_user, curr_password)
                     status = 200
-                    print("user before unquoting", curr_user)
                     curr_user = urllib.parse.unquote(curr_user)
-                    print("user after unquoting", curr_user)
                     content = ('user ' + curr_user + ' was added to the db').encode()
                     content_length = str(len(content))
                     conn = sqlite3.connect('users.db')
@@ -290,13 +266,10 @@ async def handler(request):
 
                     try:
                         # Insert a row of data
-                        print(
-                            "INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
                         cur.execute(
                             "INSERT INTO Users (username,password) VALUES ('" + curr_user + "','" + curr_password + "')")
                         conn.commit()
                     except:
-                        print("error! user already defined")
                         status, content, content_length, content_type = await conflict(curr_user)
                     conn.close()
                 else:
@@ -313,7 +286,6 @@ async def handler(request):
     if (request.method == 'DELETE'):
         if 'Authorization' in request.headers:
             author_request = request.headers['Authorization'].split(' ')
-            print("author_request: ", author_request)
             if author_request[0] == "Basic" and author_request[1] == adminCardentials.decode("utf-8"):
                 parsed_url = url_path.split('/')
                 if (parsed_url[0] == "users"):
@@ -321,7 +293,6 @@ async def handler(request):
                         user = parsed_url[1]
                     else:
                         user = ""
-                    print("username to delete is: ", user)
                     status = 200
                     content = ('user ' + user + ' was deleted from the db').encode()
                     content_length = str(len(content))
@@ -329,7 +300,6 @@ async def handler(request):
                     cur = conn.cursor()
                     try:
                         # Delete a row of data
-                        print("DELETE FROM Users WHERE username =" + "'" + user + "'")
                         cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
                         conn.commit()
                     except:
@@ -374,7 +344,6 @@ async def dp_parser(request, params, username, auth_flag=True):
             to_add = to_add[1:]
         content += to_add
 
-    print(f"[THIS IS THE CONTENT] {content}")
     return content
 
 
