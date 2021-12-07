@@ -59,8 +59,6 @@ async def parse_content(content):
     for parameter in parameters:
         if (parameter.find('username') != -1):
             user = parameter
-            print(f"user: {user}")
-            print(f"user decoded: {user.de}")
         if (parameter.find('password') != -1):
             password = parameter
     if (user != ''):
@@ -244,24 +242,31 @@ async def handler(request):
                                     print("password:", password)
                                     conn = sqlite3.connect('users.db')
                                     cur = conn.cursor()
+                                    is_admin = (username == admin_username and password == admin_password)
                                     try:
                                         cur.execute(" SELECT * FROM Users WHERE username=? AND password=?",
                                                     (username, password))
+                                        check = cur.fetchone()
                                         conn.commit()
                                     except:
-                                        print("error! user does not EXIST")
+                                        print("error!")
                                     conn.close()
-                                    content = await dp_parser(request, params, username)
-                                    content = content.encode()
-                                    content_length = str(len(content))
-                                    content_type = "text/html"
+                                    if check is None and not is_admin:
+                                        status = 401
+                                        content = await dp_parser(request, params, "None", False)
+                                        content = content.encode()
+                                        content_length = str(len(content))
+                                        autentication_flag = 1
+                                        realm = 'admin'
+                                    else:
+                                        content = await dp_parser(request, params, username)
+                                        content = content.encode()
+                                        content_length = str(len(content))
+                                        content_type = "text/html"
                             else:
-                                status = 401
                                 content = await dp_parser(request, params, "None", False)
                                 content = content.encode()
                                 content_length = str(len(content))
-                                autentication_flag = 1
-                                realm = 'admin'
             else:
                 status, content, content_length, content_type = await resource_not_found(url_path)
 
@@ -274,10 +279,14 @@ async def handler(request):
                     curr_user, curr_password = await parse_content(body.decode("utf-8"))
                     print("username and password are: ", curr_user, curr_password)
                     status = 200
+                    print("user before unquoting", curr_user)
+                    curr_user = urllib.parse.unquote(curr_user)
+                    print("user after unquoting", curr_user)
                     content = ('user ' + curr_user + ' was added to the db').encode()
                     content_length = str(len(content))
                     conn = sqlite3.connect('users.db')
                     cur = conn.cursor()
+
 
                     try:
                         # Insert a row of data
