@@ -34,7 +34,7 @@ async def parse_requst(request):
     parsed_request = request
     words = parsed_request.replace(" ", "").split('HTTP')
     path_and_extension = words[0].split('.')
-    if(len(path_and_extension) == 1):
+    if (len(path_and_extension) == 1):
         return ""
     else:
         return path_and_extension[1]  # return extension
@@ -146,6 +146,7 @@ async def unauthorized():
     content_type = "text/html"
     return status, content, content_length, content_type
 
+
 async def forbidden():
     status = 403
     text = '''
@@ -165,6 +166,7 @@ async def forbidden():
     content_length = str(len(content))
     content_type = "text/html"
     return status, content, content_length, content_type
+
 
 async def bad_request():
     status = 400
@@ -218,15 +220,15 @@ async def handler(request):
         content_type = await find_content_type(extension)
         if url_path is not None:
             if (os.path.exists(url_path)):
-                if(url_path == "users.db" or url_path == "config.py"):
+                if (url_path == "users.db" or url_path == "config.py"):
                     status, content, content_length, content_type = await forbidden()
                     autentication_flag = 0;
                     realm = 'admin'
                 else:
-                    if(os.path.isfile(url_path) == 0):
+                    if (os.path.isfile(url_path) == 0):
                         status, content, content_length, content_type = await bad_request()
                     else:
-                        async with aiofiles.open(url_path,"rb") as f:
+                        async with aiofiles.open(url_path, "rb") as f:
                             content = await f.read()
                         content_length = str(os.path.getsize(url_path))
                         status = 200
@@ -243,14 +245,15 @@ async def handler(request):
                                     cur = conn.cursor()
                                     is_admin = (username == admin_username and password == admin_password)
                                     try:
-                                        cur.execute(" SELECT * FROM Users WHERE username=? AND password=?",
-                                                    (username, password))
-                                        check = cur.fetchone()
+                                        cur.execute(f"SELECT password FROM Users WHERE username = '{username}'")
+                                        user_exists = cur.fetchone()
                                         conn.commit()
                                     except:
                                         status, content, content_length, content_type = await internal_server_error()
                                     conn.close()
-                                    if check is None and not is_admin:
+                                    if user_exists is not None and user_exists[0] != password:
+                                        status, content, content_length, content_type = await unauthorized()
+                                    elif user_exists is None and not is_admin:
                                         status = 401
                                         content = await dp_parser(request, params, "None", False)
                                         content = content.encode()
@@ -281,7 +284,6 @@ async def handler(request):
                     content_length = str(len(content))
                     conn = sqlite3.connect('users.db')
                     cur = conn.cursor()
-
 
                     try:
                         # Insert a row of data
@@ -358,7 +360,8 @@ async def dp_parser(request, params, username, auth_flag=True):
                 to_add += str
             else:
                 res = {}
-                exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}, "params": params}, res)
+                exec(f"to_add={str}", {"user": {"authenticated": auth_flag, "username": username}, "params": params},
+                     res)
                 to_add = res['to_add']
             if to_add.endswith('{'):
                 to_add = to_add[:-1]
