@@ -296,13 +296,16 @@ async def handler(request):
                     content_length = str(len(content))
                     conn = sqlite3.connect('users.db')
                     cur = conn.cursor()
-                    try:
-                        # Delete a row of data
-                        cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
-                        conn.commit()
-                    except:
-                        print("error!")
-                    conn.close()
+                    if user == admin_username:
+                        status, content, content_length, content_type = await unauthorized()
+                    else:
+                        try:
+                            # Delete a row of data
+                            cur.execute("DELETE FROM Users WHERE username =" + "'" + user + "'")
+                            conn.commit()
+                        except:
+                            print("error!")
+                        conn.close()
                 else:
                     status, content, content_length, content_type = await resource_not_found(url_path)
             else:
